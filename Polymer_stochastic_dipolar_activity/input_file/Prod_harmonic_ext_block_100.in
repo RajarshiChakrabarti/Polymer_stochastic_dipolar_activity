@@ -1,0 +1,60 @@
+variable sim loop 50
+
+label loop_start
+
+clear
+
+units              lj
+atom_style         angle
+dimension          3
+boundary           s s s
+
+read_restart       p1000_block_100_gamma_0.1.restart.10000000
+
+neighbor           3.0 bin
+
+neigh_modify       every 1 delay 0 one 100000 page 1000000 check yes
+
+pair_style         lj/cut 1.12
+pair_coeff         * * 1.0 1.0 1.12
+pair_modify        shift yes
+
+bond_style         harmonic/SDF
+
+# Different seed for each simulation
+variable seed1 equal 987989 + ${sim}
+variable seed2 equal 998765 + ${sim}
+variable seed3 equal 678423 + ${sim}
+
+#bond_coeff <type> <k> <r0> <spp0> <tau_act> <activity_flag> <seed>
+bond_coeff         1 30 1.5 0 1.0 0 ${seed1}
+
+bond_coeff         2 30 1.5 100.0 1.0 -1 ${seed2}
+
+angle_style        cosine
+angle_coeff        1 5.0
+
+###############################################################
+
+minimize           1e-6 1e-7 100000 100000
+
+fix ensemble_2 all bd 1.00 0.1 ${seed3}
+
+timestep           0.0001
+
+compute Rg_full_polymer all gyration
+
+fix Rg_full_polymer_avg all ave/time 100 1 100 c_Rg_full_polymer file Rg_ext_block_100_sim${sim}.dat
+
+thermo 100
+
+#dump 1 all custom 100 p1000_ext_bd_harmonic_F10_sim${sim}.xyz id type x y z ix iy iz
+
+#dump_modify 1 sort id
+
+run 20000000
+
+write_restart restart_sim${sim}.restart
+
+next sim
+jump Prod_harmonic_ext_loop.in loop_start
